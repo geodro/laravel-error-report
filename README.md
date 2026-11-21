@@ -109,4 +109,4 @@ PHP 8.2 or newer, Laravel 12 or 13.
 
 ## License
 
-MIT
+MIT, see [LICENSE](LICENSE).
