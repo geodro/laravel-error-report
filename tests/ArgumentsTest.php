@@ -10,6 +10,21 @@ use Throwable;
 
 class ArgumentsTest extends TestCase
 {
+    private string|false $ignoreArgs;
+
+    // Production php.ini (CI runners included) drops arguments from traces; these tests need them.
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->ignoreArgs = ini_set('zend.exception_ignore_args', '0');
+    }
+
+    protected function tearDown(): void
+    {
+        ini_set('zend.exception_ignore_args', (string) $this->ignoreArgs);
+        parent::tearDown();
+    }
+
     public function test_argument_values_are_recorded_and_user_fields_anonymised(): void
     {
         $this->reportFrom(fn () => (new Checkout)->charge($this->order(), 4242, 'SPRING', null,
