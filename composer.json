@@ -1,0 +1,28 @@
+{
+    "name": "geodro/laravel-error-report",
+    "description": "Keeps a private record of production errors on the server and prints one as a report you can hand to a coding agent.",
+    "type": "library",
+    "license": "MIT",
+    "require": {
+        "php": "^8.2",
+        "illuminate/console": "^12.0|^13.0",
+        "illuminate/support": "^12.0|^13.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^10.0|^11.0",
+        "phpunit/phpunit": "^11.0|^12.0"
+    },
+    "autoload": {
+        "psr-4": { "Geodro\\ErrorReport\\": "src/" }
+    },
+    "autoload-dev": {
+        "psr-4": { "Geodro\\ErrorReport\\Tests\\": "tests/" }
+    },
+    "extra": {
+        "laravel": {
+            "providers": ["Geodro\\ErrorReport\\ErrorReportServiceProvider"]
+        }
+    },
+    "config": { "sort-packages": true },
+    "minimum-stability": "stable"
+}
