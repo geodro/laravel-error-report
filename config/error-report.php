@@ -11,6 +11,9 @@ return [
     'channels' => array_filter(array_map('trim', explode(',', (string) env('ERROR_REPORT_CHANNELS', '')))),
     // Addresses, sent with the app's default mailer, only when it delivers (not `log` or `array`).
     'mail' => array_filter(array_map('trim', explode(',', (string) env('ERROR_REPORT_MAIL', '')))),
+    // Seconds to wait on an smtp server. Mail goes out while the error is handled, so a hung
+    // server must not hold the request for PHP's default 60s.
+    'mail_timeout' => 5,
     // Deployed commit, so the agent can check out the same code. Falls back to .git/HEAD.
     'release' => env('APP_RELEASE'),
 ];

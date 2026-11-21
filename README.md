@@ -105,7 +105,14 @@ Argument values need `zend.exception_ignore_args` off, which is PHP's own defaul
 
 ## Requirements
 
-PHP 8.2 or newer, Laravel 12 or 13.
+PHP 8.3 or newer, Laravel 12 or 13.
+
+## Development
+
+```bash
+composer test     # PHPUnit
+composer analyse  # PHPStan, level 8
+```
 
 ## License
 

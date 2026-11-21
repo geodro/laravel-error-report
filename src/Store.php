@@ -9,7 +9,10 @@ class Store
 {
     public function __construct(private string $path, private int $maxEntries) {}
 
-    /** @return array the stored entry, with its updated count */
+    /**
+     * @param array<string, mixed> $occurrence
+     * @return array<string, mixed>
+     */
     public function save(array $occurrence): array
     {
         $this->ensureDirectory();
@@ -30,14 +33,17 @@ class Store
             ];
             ftruncate($handle, 0);
             rewind($handle);
-            fwrite($handle, json_encode($entry, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE));
+            fwrite($handle, json_encode($entry, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR));
             @chmod($file, 0666);
         } finally {
             flock($handle, LOCK_UN);
             fclose($handle);
         }
 
-        $this->prune();
+        // Only a new entry can push the store past its limit; a repeat must stay cheap during an error storm.
+        if ($entry['count'] === 1) {
+            $this->prune();
+        }
 
         return $entry;
     }
@@ -52,9 +58,12 @@ class Store
         ));
         usort($entries, fn ($a, $b) => $b['seen_at'] <=> $a['seen_at']);
 
-        return array_values($entries);
+        return $entries;
     }
 
+    /**
+     * @return array<string, mixed>|null
+     */
     public function find(string $id): ?array
     {
         $this->ensureReadable();

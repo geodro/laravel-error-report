@@ -25,7 +25,10 @@ class Arguments
         'cookie', 'card', 'cvv', 'cvc', 'iban', 'ssn', 'user', 'customer', 'client', 'account', 'login',
         'username', 'avatar', 'gender', 'lat', 'lng', 'latitude', 'longitude', 'location', 'remember'];
 
-    /** @return list<array{0: string, 1: string}> name and rendered value */
+    /**
+     * @return list<array{0: string, 1: string}> name and rendered value
+     * @param array<string, mixed> $frame
+     */
     public static function forFrame(array $frame): array
     {
         $names = self::parameterNames($frame);
@@ -40,7 +43,7 @@ class Arguments
 
     public static function isUserRelated(string $name): bool
     {
-        $words = preg_split('/[^a-z0-9]+/', strtolower(preg_replace('/([a-z0-9])([A-Z])/', '$1_$2', $name)));
+        $words = preg_split('/[^a-z0-9]+/', strtolower((string) preg_replace('/([a-z0-9])([A-Z])/', '$1_$2', $name))) ?: [];
 
         return (bool) array_intersect($words, self::USER_WORDS);
     }
@@ -66,6 +69,9 @@ class Arguments
         };
     }
 
+    /**
+     * @param array<mixed> $items
+     */
     private static function renderArray(array $items, int $depth): string
     {
         if ($depth <= 0) {
@@ -92,13 +98,16 @@ class Arguments
         return $head.' {'.substr(self::renderArray(array_slice($attributes, 0, 15, true), $depth), 1, -1).'}';
     }
 
-    /** @return list<string> */
+    /**
+     * @return list<string>
+     * @param array<string, mixed> $frame
+     */
     private static function parameterNames(array $frame): array
     {
         try {
             $reflection = isset($frame['class']) && ! str_contains($frame['function'], '{closure')
                 ? new ReflectionMethod($frame['class'], $frame['function'])
-                : (function_exists($frame['function']) ? new ReflectionFunction($frame['function']) : null);
+                : (is_string($frame['function']) && function_exists($frame['function']) ? new ReflectionFunction($frame['function']) : null);
         } catch (Throwable) {
             return [];
         }

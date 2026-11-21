@@ -30,20 +30,28 @@ class ErrorReportServiceProvider extends ServiceProvider
             $this->commands([Console\ListErrors::class, Console\ShowError::class]);
         }
 
-        if (! $this->app['config']->get('error-report.enabled')) {
+        if (! $this->app->make('config')->get('error-report.enabled')) {
             return;
         }
 
         // Hooking the handler's report path means dontReport and the app's own filters still apply.
+        // Duck typed on purpose: Collision and other decorators wrap the real Handler.
         $this->callAfterResolving(ExceptionHandler::class, function ($handler) {
-            if (method_exists($handler, 'reportable')) {
+            if (is_object($handler) && method_exists($handler, 'reportable')) {
                 $handler->reportable(function (Throwable $e) {
                     $this->app->make(Recorder::class)->record($e);
                 });
             }
         });
 
-        Event::listen(JobProcessing::class, fn ($e) => $this->app->make(Recorder::class)->setJob($e->job->resolveName()));
+        // Runs before every job: a listener that throws here would fail the job itself.
+        Event::listen(JobProcessing::class, function ($e) {
+            try {
+                $this->app->make(Recorder::class)->setJob($e->job->resolveName());
+            } catch (Throwable) {
+                $this->app->make(Recorder::class)->setJob(null);
+            }
+        });
         // A worker that moves on must not blame later errors on the last job, and a failed job never fires JobProcessed.
         Event::listen([JobProcessed::class, Looping::class], fn () => $this->app->make(Recorder::class)->setJob(null));
     }

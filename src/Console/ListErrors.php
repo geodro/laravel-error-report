@@ -45,7 +45,7 @@ class ListErrors extends Command
             $e['id'],
             $e['count'],
             $e['last_seen'],
-            mb_strimwidth($e['last']['error']['class'].': '.strtok($e['last']['error']['message'], "\n"), 0, 90, '…'),
+            mb_strimwidth($e['last']['error']['class'].': '.\Geodro\ErrorReport\ReportFormatter::headline($e['last']['error']['message']), 0, 90, '…'),
         ], $entries));
         $this->line('Print one for your agent with: php artisan error-report:show <id>');
 

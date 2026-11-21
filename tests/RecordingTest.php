@@ -21,6 +21,17 @@ class RecordingTest extends TestCase
         $this->assertStringContainsString('RecordingTest.php:', $out);
     }
 
+    public function test_errors_are_recorded_when_the_handler_is_wrapped(): void
+    {
+        $this->app->extend(ExceptionHandler::class, fn ($inner) => new Fixtures\DecoratingHandler($inner));
+        $this->app->forgetInstance(ExceptionHandler::class);
+        $this->app->make(\Geodro\ErrorReport\ErrorReportServiceProvider::class, ['app' => $this->app])->boot();
+
+        report(new RuntimeException('through a wrapped handler'));
+
+        $this->assertStringContainsString('through a wrapped handler', $this->latestReport());
+    }
+
     public function test_an_exception_the_app_does_not_report_is_not_recorded(): void
     {
         $this->app->make(ExceptionHandler::class)->dontReport(RuntimeException::class);

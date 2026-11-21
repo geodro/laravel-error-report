@@ -49,30 +49,35 @@ class Recorder
     }
 
     // A destination that is down (Slack outage, bad webhook, SMTP refusing) must not stop the others.
+    /**
+     * @param array<string, mixed> $entry
+     */
     private function send(array $entry): void
     {
         $report = ReportFormatter::format($entry);
-        foreach ((array) $this->app['config']->get('error-report.channels') as $channel) {
+        foreach ((array) $this->config()->get('error-report.channels') as $channel) {
             try {
                 $this->app->make('log')->channel($channel)->error($report);
             } catch (Throwable) {
             }
         }
 
-        $to = array_values((array) $this->app['config']->get('error-report.mail'));
+        $to = array_values((array) $this->config()->get('error-report.mail'));
         if (! $to || ! $this->mailerDelivers()) {
             return;
         }
         $error = $entry['last']['error'];
-        $subject = '['.$this->app['config']->get('app.name').'] '.class_basename($error['class']).': '
-            .mb_strimwidth(strtok($error['message'], "\n"), 0, 80, '…')." (seen {$entry['count']}x)";
+        $subject = '['.$this->config()->get('app.name').'] '.class_basename($error['class']).': '
+            .mb_strimwidth(ReportFormatter::headline($error['message']), 0, 80, '…')." (seen {$entry['count']}x)";
         try {
-            $html = HtmlReport::render($entry, (string) $this->app['config']->get('app.name'));
-            $this->app->make('mailer')->raw($report, fn ($m) => $m->to($to)->subject($subject)->getSymfonyMessage()->html($html));
+            $this->mail($report, HtmlReport::render($entry, (string) $this->config()->get('app.name')), $to, $subject);
         } catch (Throwable) {
         }
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     private function occurrence(Throwable $e): array
     {
         $error = $this->describe($e);
@@ -95,10 +100,34 @@ class Recorder
         ];
     }
 
+    // Sends through the app's own mailer (its sender, events, everything), with the smtp
+    // timeout shortened for this one send: a hung server must not hold the request for 60s.
+    /**
+     * @param list<string> $to
+     */
+    private function mail(string $report, string $html, array $to, string $subject): void
+    {
+        $mailer = $this->app->make('mailer');
+        $stream = $mailer->getSymfonyTransport() instanceof \Symfony\Component\Mailer\Transport\Smtp\SmtpTransport
+            ? $mailer->getSymfonyTransport()->getStream() : null;
+        $previous = $stream instanceof \Symfony\Component\Mailer\Transport\Smtp\Stream\SocketStream ? $stream->getTimeout() : null;
+        if ($previous !== null) {
+            $stream->setTimeout(min($previous, (float) $this->config()->get('error-report.mail_timeout')));
+        }
+
+        try {
+            $mailer->raw($report, fn ($m) => $m->to($to)->subject($subject)->getSymfonyMessage()->html($html));
+        } finally {
+            if ($previous !== null) {
+                $stream->setTimeout($previous);
+            }
+        }
+    }
+
     // Laravel's default `log` mailer, and `array`, only pretend to send; an smtp mailer needs a host.
     private function mailerDelivers(): bool
     {
-        $config = $this->app['config']->get('mail.mailers.'.$this->app['config']->get('mail.default'));
+        $config = $this->config()->get('mail.mailers.'.$this->config()->get('mail.default'));
 
         return match ($config['transport'] ?? null) {
             null, 'log', 'array' => false,
@@ -107,6 +136,14 @@ class Recorder
         };
     }
 
+    private function config(): \Illuminate\Contracts\Config\Repository
+    {
+        return $this->app->make('config');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
     private function describe(Throwable $e): array
     {
         $message = match (true) {
@@ -129,7 +166,7 @@ class Recorder
             'at_file' => $e->getFile(),
             'at_line' => $e->getLine(),
             'frames' => array_map(fn ($f) => $this->relative($f['file']).':'.($f['line'] ?? 0).' '
-                .(isset($f['class']) ? $f['class'].$f['type'] : '').$f['function'].'()', $raw),
+                .(isset($f['class']) ? $f['class'].($f['type'] ?? '->') : '').$f['function'].'()', $raw),
             'frames_raw' => array_map(fn ($f) => ['file' => $f['file'], 'line' => $f['line'] ?? 0], $raw),
             'args' => array_map(fn ($f) => isset($f['args']) ? Arguments::forFrame($f) : null, $raw),
             'args_dropped' => (bool) ini_get('zend.exception_ignore_args'),
@@ -137,6 +174,10 @@ class Recorder
     }
 
     // Source around the throw site, or around the first app frame when it was thrown inside vendor.
+    /**
+     * @param array<string, mixed>|null $appFrame
+     * @return array<string, mixed>
+     */
     private function snippet(string $file, int $line, ?array $appFrame): array
     {
         if (str_contains($file, '/vendor/') && $appFrame) {
@@ -155,6 +196,9 @@ class Recorder
         return $out;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     private function context(): array
     {
         if ($this->job) {
@@ -183,7 +227,7 @@ class Recorder
         try {
             $guard = $this->app->make('auth')->guard();
 
-            return method_exists($guard, 'hasUser') ? $guard->hasUser() : false;
+            return $guard->hasUser();
         } catch (Throwable) {
             return false;
         }
@@ -191,7 +235,7 @@ class Recorder
 
     private function release(): ?string
     {
-        if ($release = $this->app['config']->get('error-report.release')) {
+        if ($release = $this->config()->get('error-report.release')) {
             return (string) $release;
         }
         $head = trim((string) @file_get_contents($this->app->basePath('.git/HEAD')));

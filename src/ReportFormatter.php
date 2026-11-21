@@ -5,6 +5,9 @@ namespace Geodro\ErrorReport;
 // Renders a stored entry as plain text sized for pasting into a coding agent.
 class ReportFormatter
 {
+    /**
+     * @param array<string, mixed> $entry
+     */
     public static function format(array $entry): string
     {
         $o = $entry['last'];
@@ -36,6 +39,9 @@ class ReportFormatter
         return implode("\n", $out)."\n";
     }
 
+    /**
+     * @param array<string, mixed> $e
+     */
     private static function error(array $e): string
     {
         $lines = ["{$e['class']}: {$e['message']}", "  thrown at {$e['at']}"];
@@ -55,6 +61,16 @@ class ReportFormatter
         return implode("\n", $lines);
     }
 
+    public static function headline(string $message): string
+    {
+        $first = trim(explode("\n", $message)[0]);
+
+        return $first === '' ? '(no message)' : $first;
+    }
+
+    /**
+     * @param array<string, mixed> $c
+     */
     public static function context(array $c): string
     {
         return match ($c['type']) {

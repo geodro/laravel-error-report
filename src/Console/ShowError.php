@@ -25,7 +25,8 @@ class ShowError extends Command
 
     private function show(Store $store): int
     {
-        $id = (string) $this->argument('id');
+        $id = $this->argument('id');
+        $id = is_string($id) ? $id : 'latest';
         $entry = $store->find($id);
         if (! $entry) {
             $this->error($id === 'latest' ? 'No errors recorded.' : "No recorded error with id {$id}.");
