@@ -88,7 +88,7 @@ class Recorder
         $top = $error['frames'][0] ?? $error['at'];
 
         return [
-            'id' => substr(sha1($error['class'].'|'.$error['at'].'|'.$top), 0, 10),
+            'id' => substr(sha1($error['class'].'|'.$error['at'].'|'.$top.'|'.self::shape($error['message'])), 0, 10),
             'error' => $error,
             'previous' => $previous,
             'snippet' => $this->snippet($error['at_file'], $error['at_line'], $error['frames_raw'][0] ?? null),
@@ -139,6 +139,13 @@ class Recorder
     private function config(): \Illuminate\Contracts\Config\Repository
     {
         return $this->app->make('config');
+    }
+
+    // The message without what varies per occurrence (numbers, quoted values), so different
+    // problems from one throw site stay apart while one problem with different ids stays one.
+    private static function shape(string $message): string
+    {
+        return (string) preg_replace(['/\d+/', "/'[^']*'|\"[^\"]*\"/"], ['#', '?'], $message);
     }
 
     /**

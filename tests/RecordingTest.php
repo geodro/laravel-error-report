@@ -65,6 +65,29 @@ class RecordingTest extends TestCase
         $this->assertStringContainsString('Seen 1 time,', $this->latestReport());
     }
 
+    public function test_different_problems_from_the_same_place_are_separate_entries(): void
+    {
+        foreach (['Payment gateway timed out', 'Card was declined', 'Currency not supported'] as $problem) {
+            $this->failInHelper($problem);
+        }
+
+        Artisan::call('error-report:list');
+        $list = Artisan::output();
+
+        $this->assertStringContainsString('timed out', $list);
+        $this->assertStringContainsString('declined', $list);
+        $this->assertStringContainsString('not supported', $list);
+    }
+
+    public function test_the_same_problem_with_different_ids_stays_one_entry(): void
+    {
+        foreach ([7, 42, 315] as $order) {
+            $this->failInHelper("Order {$order} could not be charged");
+        }
+
+        $this->assertStringContainsString('Seen 3 times', $this->latestReport());
+    }
+
     public function test_old_entries_are_pruned_past_the_limit(): void
     {
         config(['error-report.max_entries' => 2]);
@@ -187,5 +210,11 @@ class RecordingTest extends TestCase
     private function resetLink(): string
     {
         return '/password/reset/9f8e7d6c5b4a39281706f5e4d3c2b1a0?email=jane@example.com';
+    }
+
+    // One throw site and one caller, like an app's shared API helper.
+    private function failInHelper(string $message): void
+    {
+        report(new RuntimeException($message));
     }
 }
